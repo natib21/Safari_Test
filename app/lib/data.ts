@@ -9,7 +9,7 @@ export interface Product {
   brand: string;
   stock: number;
   image: string;
-  specs: Record<string, string | number>; 
+  specs: Record<string, string | number>;
   rating: {
     rate: number;
     count: number;
@@ -30,34 +30,52 @@ export interface ProductQueryParams {
   limit?: number;
   category?: string;
   search?: string;
-  sort?: string; 
+  sort?: string;
 }
-
-
 
 export async function fetchProducts({
   page = 1,
   limit = 10,
- 
+  search,
+  category,
+  sort,
 }: ProductQueryParams = {}): Promise<ProductsResponse> {
   const params = new URLSearchParams();
 
-  if (page)   params.set("page",   page.toString());
-  if (limit)  params.set("limit",  limit.toString());
-  // if (search)   params.set("search", search);
-  // if (category) params.set("category", category);
-  // if (sort)     params.set("sort", sort);
+  // Always include pagination params
+  params.set("page", page.toString());
+  params.set("limit", limit.toString());
+
+  // Add optional filters/search/sort only if provided
+  if (search) {
+    params.set("search", search.trim());
+  }
+  if (category) {
+    params.set("category", category);
+  }
+  if (sort) {
+    params.set("sort", sort);
+    // If your API needs sort direction, you could extend later e.g.:
+    // params.set("order", "asc"); // or make sort = "price-desc"
+  }
 
   const url = `https://fakeapi.net/products?${params.toString()}`;
 
   const res = await fetch(url, {
-    cache: "no-store",          // or "force-cache" if data rarely changes
-    // next: { revalidate: 3600 } ← if you want ISR
+    cache: "no-store", // always fresh data (disable if you want caching)
+    // next: { revalidate: 3600 } // ← use this for ISR if data changes slowly
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch products: ${res.status}`);
+    throw new Error(`Failed to fetch products: ${res.status} ${res.statusText}`);
   }
 
-  return res.json();
+  const json = await res.json();
+
+  // Optional: basic validation / fallback
+  if (!json.data || !Array.isArray(json.data) || !json.pagination) {
+    throw new Error("Invalid response format from API");
+  }
+
+  return json as ProductsResponse;
 }

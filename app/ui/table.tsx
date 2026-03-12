@@ -9,7 +9,7 @@ export default function ProductTableClient() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('title');
 
-  const limit = 10;
+  const limit = 5; // 5 items per page as requested
 
   const { data, isLoading, error, isFetching } = useQuery({
     queryKey: ['products', { page, limit, search, sort }],
@@ -17,11 +17,11 @@ export default function ProductTableClient() {
       fetchProducts({
         page,
         limit,
-        search: search || undefined, // don't send empty string if backend doesn't like it
-        sort,
+        search: search || undefined,
+        sort, // will be sent as ?sort=title or ?sort=price
       }),
     staleTime: 5 * 60 * 1000,
-    keepPreviousData: true, // keeps previous data visible during refetch → smoother UX
+    keepPreviousData: true,
   });
 
   if (isLoading && !data) {
@@ -41,7 +41,11 @@ export default function ProductTableClient() {
   }
 
   const products = data?.data ?? [];
-  const totalPages = data?.pagination?.totalPages ?? 1;
+  const total = data?.pagination?.total ?? 0;
+  const totalPages = Math.ceil(total / limit) || 1;
+
+  const hasPrevious = page > 1;
+  const hasNext = page < totalPages;
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -57,7 +61,7 @@ export default function ProductTableClient() {
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
-              setPage(1); // reset pagination when search changes
+              setPage(1); // reset to page 1 when search changes
             }}
           />
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -83,7 +87,6 @@ export default function ProductTableClient() {
         >
           <option value="title">Sort by Title</option>
           <option value="price">Sort by Price</option>
-          {/* Add more options later if backend supports them */}
         </select>
       </div>
 
@@ -93,34 +96,19 @@ export default function ProductTableClient() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                >
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Title
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                >
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Price
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                >
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Category
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                >
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Stock
                 </th>
-                <th
-                  scope="col"
-                  className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                >
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Rating
                 </th>
               </tr>
@@ -166,11 +154,14 @@ export default function ProductTableClient() {
           </table>
         </div>
 
-        {/* Pagination + loading indicator */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between text-sm text-gray-600">
+        {/* Pagination */}
+        <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600">
           <div>
-            Page <span className="font-medium text-gray-900">{page}</span> of{' '}
-            <span className="font-medium text-gray-900">{totalPages}</span>
+            Showing{' '}
+            <span className="font-medium text-gray-900">
+              {(page - 1) * limit + 1}–{Math.min(page * limit, total)}
+            </span>{' '}
+            of <span className="font-medium text-gray-900">{total}</span>
             {isFetching && <span className="ml-2 text-gray-400">(updating...)</span>}
           </div>
 
@@ -178,18 +169,22 @@ export default function ProductTableClient() {
             <button
               className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 
                          hover:bg-gray-50 hover:text-gray-900 transition-colors
-                         disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-              disabled={page === 1 || isFetching}
-              onClick={() => setPage((p) => p - 1)}
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!hasPrevious || isFetching}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
               Previous
             </button>
 
+            <span className="font-medium">
+              Page {page} of {totalPages}
+            </span>
+
             <button
               className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 
                          hover:bg-gray-50 hover:text-gray-900 transition-colors
-                         disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
-              disabled={page === totalPages || isFetching}
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!hasNext || isFetching}
               onClick={() => setPage((p) => p + 1)}
             >
               Next
